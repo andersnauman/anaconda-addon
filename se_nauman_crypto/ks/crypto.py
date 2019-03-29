@@ -17,9 +17,6 @@ class CryptoData(AddonData):
         if self.yubikey:
             addon_str += " --{}".format(self.yubikey)
 
-        if self.encrypted:
-            addon_str += " --{}".format(self.encrypted)
-
         # Do not add passphrase!
 
         # min-char
