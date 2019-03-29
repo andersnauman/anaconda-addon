@@ -1,0 +1,9 @@
+#!/bin/sh -x
+
+if [ ! -f /etc/reconfigSys ]; then
+    touch /etc/reconfigSys
+fi
+
+./initial-setup-graphical.py
+
+rm /etc/reconfigSys
