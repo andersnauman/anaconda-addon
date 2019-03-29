@@ -1,0 +1,4 @@
+- Make sure the passphrase is saved onto the yubikey. Does nothing right know except setting the password for LUKS.
+- Make tui-support
+- Add support for min/max length of the passphrase, both default and through kickstart
+- Debug why hub-view gets wierd when too much text is presented through "status"-text. Only in Fedora 29+?
