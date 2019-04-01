@@ -1,6 +1,6 @@
 ADDON = se_nauman_packages se_nauman_crypto
 ADDONDIR = /usr/share/anaconda/addons/
-PICS = pics/
+PICS = pics/*
 PICSDIR = /usr/share/anaconda/pixmaps/
 OUTFILE = /tmp/anaconda_addon.img
 
