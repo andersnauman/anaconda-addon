@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/python
 
 import os
 
@@ -10,8 +10,5 @@ try:
     is_instance.run()
 except InitialSetupError:
     exit(1)
-
-#if is_instance.reboot_on_quit:
-#    os.system("reboot")
-
+    
 exit(0)
