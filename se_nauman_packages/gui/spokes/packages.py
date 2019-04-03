@@ -1,7 +1,7 @@
-from ...categories.packages import PackagesCategory
 from pyanaconda.ui.gui.spokes import NormalSpoke
 from pyanaconda.ui.common import FirstbootSpokeMixIn
 from pyanaconda.ui.gui.utils import escape_markup
+from pyanaconda.ui.categories.software import SoftwareCategory
 
 import gi
 gi.require_version("Gtk", "3.0")
@@ -19,9 +19,9 @@ class PackagesSpoke(FirstbootSpokeMixIn, NormalSpoke):
     builderObjects = ["packagesSpokeWindow"]
     mainWidgetName = "packagesSpokeWindow"
     uiFile = "packages.glade"
-    category = PackagesCategory
+    category = SoftwareCategory
     icon = "package-x-generic-symbolic"
-    title = N_("_Packages")
+    title = N_("_PRIVATE PACKAGES")
 
     def __init__(self, data, storage, payload, instclass):
         NormalSpoke.__init__(self, data, storage, payload, instclass)
