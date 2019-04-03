@@ -4,15 +4,12 @@ from pyanaconda.ui.gui.spokes import NormalSpoke
 from pyanaconda.ui.common import FirstbootSpokeMixIn
 from pyanaconda.ui.categories.system import SystemCategory
 
-from secrets import SystemRandom
+from random import SystemRandom
 import string
 import yubico
 import binascii
 import os
 from Crypto.Cipher import AES
-
-from pyanaconda.modules.common.constants.objects import AUTO_PARTITIONING
-from pyanaconda.modules.common.constants.services import STORAGE
 
 
 _ = lambda x: x
@@ -39,11 +36,8 @@ class CryptoSpoke(FirstbootSpokeMixIn, NormalSpoke):
         self._yubikeyCheckBox = None
 
         # Storage settings
-        #   Storage-spoke need to be synced.
-        self._auto_part_observer = STORAGE.get_observer(AUTO_PARTITIONING)
-        self._auto_part_observer.connect()
-        #   Passphrase to use
-        #   Real phrase is set to self.storage.encryption_passphrase later
+        #   Passphrase to use(if choosen, default is "")
+        #   The actually passphrase is set in another spoke through self.storage
         self._passphrase = self.data.addons.se_nauman_crypto.passphrase
         self._length = self.data.addons.se_nauman_crypto.length
         #   Generate and set passphrase
@@ -73,7 +67,7 @@ class CryptoSpoke(FirstbootSpokeMixIn, NormalSpoke):
 
     @property
     def completed(self):
-        if self.storage.encryption_passphrase == "":
+        if self._passphrase == "":
             return False
 
         if self._yubikeyActive is True:
@@ -90,7 +84,7 @@ class CryptoSpoke(FirstbootSpokeMixIn, NormalSpoke):
 
     @property
     def status(self):
-        status = "Using yubikey: {}".format(self._yubikeyActive)
+        status = "Yubikey: {}".format(self._yubikeyActive)
         if self._yubikeyActive is True:
             try:
                 self._getYubikey()
@@ -107,7 +101,7 @@ class CryptoSpoke(FirstbootSpokeMixIn, NormalSpoke):
         return _(status)
 
     def _updateDiskCrypto(self):
-        # If passphrase is empty, create one.
+        # If passphrase is empty(default), create one.
         if self._passphrase == "":
             if self._yubikeyActive is True:
                 try:
@@ -115,12 +109,10 @@ class CryptoSpoke(FirstbootSpokeMixIn, NormalSpoke):
                 except:
                     self._passphrase = ""
             else:
-                self._passphrase = "".join(SystemRandom().choice(string.ascii_letters + string.digits + "!#%&/()=@£${}[]'*-_.,;:<>|".decode('utf8')) for _ in range(20))
+                self._passphrase = "".join(SystemRandom().choice(string.ascii_letters + string.digits + "!#%&/()=@£${}[]'*-_.,;:<>|".decode('utf8')) for _ in range(self._length))
 
-        self._auto_part_observer.proxy.SetPassphrase(self._passphrase)
-        self.storage.encryption_passphrase = self._auto_part_observer.proxy.Passphrase
-        if self.storage.encrypted_autopart is False:
-            self.storage.encrypted_autopart = True
+        self.data.autopart.encrypted = True
+        self.data.autopart.passphrase = self._passphrase
 
     def _getYubikey(self):
         try:
