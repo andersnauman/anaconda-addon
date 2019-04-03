@@ -1,10 +1,15 @@
-from ...categories.crypto import CryptoCategory
+# -*- coding: utf-8 -*-
+
 from pyanaconda.ui.gui.spokes import NormalSpoke
 from pyanaconda.ui.common import FirstbootSpokeMixIn
+from pyanaconda.ui.categories.system import SystemCategory
 
 from secrets import SystemRandom
 import string
 import yubico
+import binascii
+import os
+from Crypto.Cipher import AES
 
 from pyanaconda.modules.common.constants.objects import AUTO_PARTITIONING
 from pyanaconda.modules.common.constants.services import STORAGE
@@ -20,14 +25,15 @@ class CryptoSpoke(FirstbootSpokeMixIn, NormalSpoke):
     builderObjects = ["cryptoSpokeWindow"]
     mainWidgetName = "cryptoSpokeWindow"
     uiFile = "crypto.glade"
-    category = CryptoCategory
+    category = SystemCategory
     icon = "drive-harddisk-symbolic"
-    title = N_("_Disk Crypto")
+    title = N_("_DISK ENCRYPTION")
 
     def __init__(self, data, storage, payload, instclass):
         NormalSpoke.__init__(self, data, storage, payload, instclass)
 
         # Yubikey settings
+        self._yubikey = None
         self._yubikeyActive = self.data.addons.se_nauman_crypto.yubikey
         self._yubikeyVersion = 0
         self._yubikeyCheckBox = None
@@ -38,7 +44,8 @@ class CryptoSpoke(FirstbootSpokeMixIn, NormalSpoke):
         self._auto_part_observer.connect()
         #   Passphrase to use
         #   Real phrase is set to self.storage.encryption_passphrase later
-        self.passphrase = self.data.addons.se_nauman_crypto.passphrase
+        self._passphrase = self.data.addons.se_nauman_crypto.passphrase
+        self._length = self.data.addons.se_nauman_crypto.length
         #   Generate and set passphrase
         self._updateDiskCrypto()
 
@@ -58,7 +65,6 @@ class CryptoSpoke(FirstbootSpokeMixIn, NormalSpoke):
         self._updateDiskCrypto()
 
     def execute(self):
-        # Set passphrase on yubikey
         pass
 
     @property
@@ -93,19 +99,25 @@ class CryptoSpoke(FirstbootSpokeMixIn, NormalSpoke):
             else:
                 status += "\nYubikey Status: {}".format(self._yubikeyVersion)
 
-        if self.passphrase != "":
-            status += "\nCrypto key:\n{}".format(self.passphrase)
+        if self._passphrase != "":
+            status += "\nKey:\n{}".format(self._passphrase)
         else:
-            status += "\nCrypto key: None\n"
+            status += "\nKey: None\n"
 
         return _(status)
 
     def _updateDiskCrypto(self):
         # If passphrase is empty, create one.
-        if self.passphrase == "":
-            self.passphrase = "".join(SystemRandom().choice(string.ascii_letters + string.digits + string.punctuation) for _ in range(20))
+        if self._passphrase == "":
+            if self._yubikeyActive is True:
+                try:
+                    self._passphrase = self._generateKey()
+                except:
+                    self._passphrase = ""
+            else:
+                self._passphrase = "".join(SystemRandom().choice(string.ascii_letters + string.digits + "!#%&/()=@£${}[]'*-_.,;:<>|".decode('utf8')) for _ in range(20))
 
-        self._auto_part_observer.proxy.SetPassphrase(self.passphrase)
+        self._auto_part_observer.proxy.SetPassphrase(self._passphrase)
         self.storage.encryption_passphrase = self._auto_part_observer.proxy.Passphrase
         if self.storage.encrypted_autopart is False:
             self.storage.encrypted_autopart = True
@@ -114,7 +126,7 @@ class CryptoSpoke(FirstbootSpokeMixIn, NormalSpoke):
         try:
             skip = 0
             while skip < 5:
-                yubikey = yubico.find_yubikey(skip=skip)
+                self._yubikey = yubico.find_yubikey(skip=skip)
                 skip += 1
         except yubico.yubikey.YubiKeyError:
             pass
@@ -124,4 +136,43 @@ class CryptoSpoke(FirstbootSpokeMixIn, NormalSpoke):
         if skip > 1:
             raise ValueError("Too many yubikey:s were found")
 
-        return yubikey
+        self._yubikeyVersion = self._yubikey.version()
+
+    def _generateKey(self):
+        if self._yubikey is None:
+            raise ValueError("No yubikey available")
+
+        key = binascii.hexlify(os.urandom(16))
+        keyFixed = binascii.hexlify(os.urandom(16))
+
+        cfg = self._yubikey.init_config()
+        cfg.aes_key("h:" + key.decode("utf-8"))
+        cfg.config_flag('STATIC_TICKET', True)
+        cfg.fixed_string("h:" + keyFixed.decode("utf-8"))
+
+        try:
+            yk.write_config(cfg, slot=1) 
+        except:
+            raise ValueError("Write error")
+
+        return self._predict(key, keyFixed)
+        
+    def _predict(self, key, keyFixed):
+        fixed = b'000000000000ffffffffffffffff0f2e' # Magic static key, undocumented?
+        enc = AES.new(binascii.unhexlify(key), AES.MODE_CBC, b'\x00' * 16)
+        data = enc.encrypt(binascii.unhexlify(fixed))
+        
+        # Translate to scan code safe string.
+        try:
+            # Python 2
+            maketrans = string.maketrans
+        except AttributeError:
+            # Python 3
+            maketrans = bytes.maketrans
+        t_map = maketrans(b"0123456789abcdef", b"cbdefghijklnrtuv")
+
+        outKey = binascii.hexlify(data).translate(t_map).decode("utf-8")
+        outKeyFixed = keyFixed.decode("utf-8").translate(t_map)
+
+        return outKeyFixed + outKey
+
