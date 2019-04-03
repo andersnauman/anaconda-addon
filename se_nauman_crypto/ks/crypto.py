@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 from pyanaconda.addons import AddonData
 from pykickstart.options import KSOptionParser
 
@@ -8,8 +10,8 @@ class CryptoData(AddonData):
     def __init__(self, name):
         AddonData.__init__(self, name)
         self.yubikey = False
-        # self.enabled = False
         self.passphrase = ""
+        self.length = 20
 
     def __str__(self):
         addon_str = "%addon {}".format(self.name)
@@ -17,10 +19,9 @@ class CryptoData(AddonData):
         if self.yubikey:
             addon_str += " --{}".format(self.yubikey)
 
-        # Do not add passphrase!
+        addon_str += " --length={}".format(20)
 
-        # min-char
-        # max-char
+        # Do not add passphrase!
 
         addon_str += "\n%end\n"
 
@@ -30,9 +31,11 @@ class CryptoData(AddonData):
         op = KSOptionParser()
         op.add_option("--yubikey", action="store_true", default=False, dest="yubikey", help="")
         op.add_option("--passphrase", action="store_true", default="", dest="passphrase", help="")
+        op.add_option("--length", action="store_true", default=20, dest="length", help="")
         (opts, extra) = op.parse_args(args=args, lineno=lineno)
         self.yubikey = opts.yubikey
         self.passphrase = opts.passphrase
+        self.length = opts.length
 
     def handle_line(self, line):
         pass
