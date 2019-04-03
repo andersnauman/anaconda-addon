@@ -25,7 +25,12 @@ install:
 	mkdir -p $(DESTDIR)$(PICSDIR)
 	cp -rv $(PICS) $(DESTDIR)$(PICSDIR)
 
-package: install
+dependencies:
+	$(eval files:=$(shell ./dependencies.sh))
+	$(foreach file, $(files), `rpm2cpio $(file) | cpio -idmvD $(DESTDIR)`)
+
+
+package: install dependencies
 	cd $(DESTDIR) && find . | cpio -c -o | gzip -9cv > $(OUTFILE)
 	@echo "You can find the image at $(OUTFILE)"
 
