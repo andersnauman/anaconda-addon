@@ -14,10 +14,6 @@ all:
 install:
 	mkdir -p $(DESTDIR)$(ADDONDIR)
 	
-	# Dependencies
-	$(eval files:=$(shell ./dependencies.sh))
-	$(foreach file, $(files), `rpm2cpio $(file) | cpio -idmvD $(DESTDIR)`)
-	
 	# Addon
 	cp -rv $(ADDON) $(DESTDIR)$(ADDONDIR)
 	
@@ -28,7 +24,6 @@ install:
 dependencies:
 	$(eval files:=$(shell ./dependencies.sh))
 	$(foreach file, $(files), `rpm2cpio $(file) | cpio -idmvD $(DESTDIR)`)
-
 
 package: install dependencies
 	cd $(DESTDIR) && find . | cpio -c -o | gzip -9cv > $(OUTFILE)
