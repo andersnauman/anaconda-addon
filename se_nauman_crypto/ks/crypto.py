@@ -17,7 +17,7 @@ class CryptoData(AddonData):
         addon_str = "%addon {}".format(self.name)
 
         if self.yubikey:
-            addon_str += " --{}".format(self.yubikey)
+            addon_str += " --yubikey"
 
         addon_str += " --length={}".format(20)
 
