@@ -34,18 +34,28 @@ class CryptoSpoke(FirstbootSpokeMixIn, NormalSpoke):
         self._yubikeyActive = self.data.addons.se_nauman_crypto.yubikey
         self._yubikeyVersion = 0
         self._yubikeyCheckBox = None
+        self._yubikeyError = ""
 
         # Storage settings
         #   Passphrase to use(if choosen, default is "")
         #   The actually passphrase is set in another spoke through self.storage
         self._passphrase = self.data.addons.se_nauman_crypto.passphrase
         self._length = self.data.addons.se_nauman_crypto.length
-        #   Generate and set passphrase
-        self._updateDiskCrypto()
+        self._newPassphrase = False
 
     def initialize(self):
         NormalSpoke.initialize(self)
         self._yubikeyCheckBox = self.builder.get_object("yubikey")
+
+        # Get Yubikey. Will assign self._yubikey and set self._yubikeyVersion
+        try:
+            self._getYubikey()
+        except ValueError as e:
+            self._yubikeyError = e
+            return
+            
+        # Generate and set passphrase
+        self._updateDiskCrypto()
 
     def refresh(self):
         self._yubikeyCheckBox.set_active(self._yubikeyActive)
@@ -55,6 +65,7 @@ class CryptoSpoke(FirstbootSpokeMixIn, NormalSpoke):
 
         if self.data.addons.se_nauman_crypto.yubikey is not self._yubikeyActive:
             self.data.addons.se_nauman_crypto.yubikey = self._yubikeyActive
+            self._newPassphrase = True
 
         self._updateDiskCrypto()
 
@@ -70,11 +81,8 @@ class CryptoSpoke(FirstbootSpokeMixIn, NormalSpoke):
         if self._passphrase == "":
             return False
 
-        if self._yubikeyActive is True:
-            try:
-                self._getYubikey()
-            except ValueError:
-                return False
+        if self._yubikeyActive is True and self._yubikeyVersion == 0:
+            return False
 
         return True
 
@@ -86,15 +94,13 @@ class CryptoSpoke(FirstbootSpokeMixIn, NormalSpoke):
     def status(self):
         status = "Yubikey: {}".format(self._yubikeyActive)
         if self._yubikeyActive is True:
-            try:
-                self._getYubikey()
-            except ValueError as e:
-                status += "\nYubikey Status: {}".format(e)
+            if self._yubikeyVersion == 0 or self._yubikeyError != "":
+                status += "\nStatus: {}".format(self._yubikeyError)
             else:
-                status += "\nYubikey Status: {}".format(self._yubikeyVersion)
+                status += "\nStatus: {}".format(self._yubikeyVersion)
 
         if self._passphrase != "":
-            status += "\nKey:\n{}".format(self._passphrase)
+            status += "\nKey: {}".format(self._passphrase)
         else:
             status += "\nKey: None\n"
 
@@ -102,14 +108,16 @@ class CryptoSpoke(FirstbootSpokeMixIn, NormalSpoke):
 
     def _updateDiskCrypto(self):
         # If passphrase is empty(default), create one.
-        if self._passphrase == "":
+        if self._passphrase == "" or self._newPassphrase:
             if self._yubikeyActive is True:
                 try:
                     self._passphrase = self._generateKey()
-                except:
+                except ValueError as e:
+                    self._yubikeyError = e
                     self._passphrase = ""
             else:
                 self._passphrase = "".join(SystemRandom().choice(string.ascii_letters + string.digits + "!#%&/()=@£${}[]'*-_.,;:<>|".decode('utf8')) for _ in range(self._length))
+            self._newPassphrase = False
 
         self.data.autopart.encrypted = True
         self.data.autopart.passphrase = self._passphrase
@@ -118,14 +126,18 @@ class CryptoSpoke(FirstbootSpokeMixIn, NormalSpoke):
         try:
             skip = 0
             while skip < 5:
-                self._yubikey = yubico.find_yubikey(skip=skip)
+                yk = yubico.find_yubikey(skip=skip)
+                if yk is not None:
+                    self._yubikey = yk # Assumes that only one yubikey could be found. Multiple yubikey will overwrite.
                 skip += 1
-        except yubico.yubikey.YubiKeyError:
+        except yubico.yubikey.YubiKeyError as e:
             pass
 
         if skip == 0:
+            self._yubikey = None
             raise ValueError("No yubikey were found")
         if skip > 1:
+            self._yubikey = None
             raise ValueError("Too many yubikey:s were found")
 
         self._yubikeyVersion = self._yubikey.version()
@@ -143,7 +155,7 @@ class CryptoSpoke(FirstbootSpokeMixIn, NormalSpoke):
         cfg.fixed_string("h:" + keyFixed.decode("utf-8"))
 
         try:
-            yk.write_config(cfg, slot=1) 
+            self._yubikey.write_config(cfg, slot=1) 
         except:
             raise ValueError("Write error")
 
@@ -161,10 +173,10 @@ class CryptoSpoke(FirstbootSpokeMixIn, NormalSpoke):
         except AttributeError:
             # Python 3
             maketrans = bytes.maketrans
-        t_map = maketrans(b"0123456789abcdef", b"cbdefghijklnrtuv")
+        t_map = maketrans("0123456789abcdef", "cbdefghijklnrtuv")
 
-        outKey = binascii.hexlify(data).translate(t_map).decode("utf-8")
-        outKeyFixed = keyFixed.decode("utf-8").translate(t_map)
+        outKey = binascii.hexlify(data).translate(t_map)
+        outKeyFixed = keyFixed.translate(t_map)
 
         return outKeyFixed + outKey
 
