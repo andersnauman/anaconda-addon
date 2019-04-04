@@ -3,6 +3,7 @@ ADDONDIR = /usr/share/anaconda/addons/
 PICS = pics/*
 PICSDIR = /usr/share/anaconda/pixmaps/
 OUTFILE = /tmp/anaconda_addon.img
+DESTDIR := $(if $(DESTDIR),$(DESTDIR),)
 
 all:
 	@echo "usage:"
