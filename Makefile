@@ -24,7 +24,7 @@ install:
 
 dependencies:
 	$(eval files:=$(shell ./dependencies.sh))
-	$(foreach file, $(files), `rpm2cpio $(file) | cpio -idmvD $(DESTDIR)`)
+	$(foreach file, $(files), `rpm2cpio $(file) | cpio -idmv -D $(DESTDIR)`)
 
 package: install dependencies
 	cd $(DESTDIR) && find . | cpio -c -o | gzip -9cv > $(OUTFILE)
