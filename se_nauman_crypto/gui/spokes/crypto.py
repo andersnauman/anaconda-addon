@@ -53,7 +53,7 @@ class CryptoSpoke(FirstbootSpokeMixIn, NormalSpoke):
         except ValueError as e:
             self._yubikeyError = e
             return
-            
+
         # Generate and set passphrase
         self._updateDiskCrypto()
 
@@ -130,7 +130,7 @@ class CryptoSpoke(FirstbootSpokeMixIn, NormalSpoke):
                 if yk is not None:
                     self._yubikey = yk # Assumes that only one yubikey could be found. Multiple yubikey will overwrite.
                 skip += 1
-        except yubico.yubikey.YubiKeyError as e:
+        except yubico.yubikey.YubiKeyError:
             pass
 
         if skip == 0:
