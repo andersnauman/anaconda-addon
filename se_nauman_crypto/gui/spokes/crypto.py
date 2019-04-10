@@ -6,6 +6,7 @@ from pyanaconda.ui.common import FirstbootSpokeMixIn
 from pyanaconda.ui.categories.system import SystemCategory
 
 from secrets import SystemRandom
+import string
 import yubico
 import binascii
 import os
