@@ -1,3 +1,4 @@
+#!/usr/bin/python3
 # -*- coding: utf-8 -*-
 
 from pyanaconda.ui.gui.spokes import NormalSpoke
@@ -5,7 +6,6 @@ from pyanaconda.ui.common import FirstbootSpokeMixIn
 from pyanaconda.ui.categories.system import SystemCategory
 
 from secrets import SystemRandom
-import string
 import yubico
 import binascii
 import os
@@ -58,7 +58,6 @@ class CryptoSpoke(FirstbootSpokeMixIn, NormalSpoke):
             self._getYubikey()
         except ValueError as e:
             self._yubikeyError = e
-            return
         
         #   Generate and set passphrase
         self._updateDiskCrypto()
@@ -87,7 +86,7 @@ class CryptoSpoke(FirstbootSpokeMixIn, NormalSpoke):
         if self.storage.encryption_passphrase == "":
             return False
 
-        if self._yubikeyActive is True and self._yubikeyVersion == 0:
+        if self._yubikeyActive is True and self._yubikeyError != "":
             return False
 
         return True
@@ -100,7 +99,7 @@ class CryptoSpoke(FirstbootSpokeMixIn, NormalSpoke):
     def status(self):
         status = "Using yubikey: {}".format(self._yubikeyActive)
         if self._yubikeyActive is True:
-            if self._yubikeyVersion == 0 or self._yubikeyError != "":
+            if self._yubikeyError != "":
                 status += "\nStatus: {}".format(self._yubikeyError)
             else:
                 status += "\nStatus: {}".format(self._yubikeyVersion)
@@ -175,12 +174,7 @@ class CryptoSpoke(FirstbootSpokeMixIn, NormalSpoke):
         data = enc.encrypt(binascii.unhexlify(fixed))
         
         # Translate to scan code safe string.
-        try:
-            # Python 2
-            maketrans = string.maketrans
-        except AttributeError:
-            # Python 3
-            maketrans = bytes.maketrans
+        maketrans = bytes.maketrans
         t_map = maketrans(b"0123456789abcdef", b"cbdefghijklnrtuv")
 
         outKey = binascii.hexlify(data).translate(t_map).decode("utf-8")
