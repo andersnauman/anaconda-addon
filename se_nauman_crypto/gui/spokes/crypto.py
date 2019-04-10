@@ -1,3 +1,4 @@
+#!/usr/bin/python2
 # -*- coding: utf-8 -*-
 
 from pyanaconda.ui.gui.spokes import NormalSpoke
@@ -32,8 +33,8 @@ class CryptoSpoke(FirstbootSpokeMixIn, NormalSpoke):
         # Yubikey settings
         self._yubikey = None
         self._yubikeyActive = self.data.addons.se_nauman_crypto.yubikey
-        self._yubikeyVersion = 0
         self._yubikeyCheckBox = None
+        self._yubikeyVersion = 0
         self._yubikeyError = ""
 
         # Storage settings
@@ -52,7 +53,8 @@ class CryptoSpoke(FirstbootSpokeMixIn, NormalSpoke):
             self._getYubikey()
         except ValueError as e:
             self._yubikeyError = e
-            return
+        else:
+            self._yubikeyCheckBox.set_active(True)
 
         # Generate and set passphrase
         self._updateDiskCrypto()
@@ -81,7 +83,7 @@ class CryptoSpoke(FirstbootSpokeMixIn, NormalSpoke):
         if self._passphrase == "":
             return False
 
-        if self._yubikeyActive is True and self._yubikeyVersion == 0:
+        if self._yubikeyActive is True and self._yubikeyError != "":
             return False
 
         return True
@@ -94,13 +96,13 @@ class CryptoSpoke(FirstbootSpokeMixIn, NormalSpoke):
     def status(self):
         status = "Yubikey: {}".format(self._yubikeyActive)
         if self._yubikeyActive is True:
-            if self._yubikeyVersion == 0 or self._yubikeyError != "":
+            if self._yubikeyError != "":
                 status += "\nStatus: {}".format(self._yubikeyError)
             else:
                 status += "\nStatus: {}".format(self._yubikeyVersion)
 
         if self._passphrase != "":
-            status += "\nKey: {}".format(self._passphrase)
+            status += "\nKey: {}".format(self.data.autopart.passphrase)
         else:
             status += "\nKey: None\n"
 
@@ -116,7 +118,7 @@ class CryptoSpoke(FirstbootSpokeMixIn, NormalSpoke):
                     self._yubikeyError = e
                     self._passphrase = ""
             else:
-                self._passphrase = "".join(SystemRandom().choice(string.ascii_letters + string.digits + "!#%&/()=@£${}[]'*-_.,;:<>|".decode('utf8')) for _ in range(self._length))
+                self._passphrase = "".join(SystemRandom().choice(string.ascii_letters + string.digits + "!#%&/()=@${}[]'*-_.,;:<>|".decode('utf8')) for _ in range(self._length))
             self._newPassphrase = False
 
         self.data.autopart.encrypted = True
@@ -141,6 +143,7 @@ class CryptoSpoke(FirstbootSpokeMixIn, NormalSpoke):
             raise ValueError("Too many yubikey:s were found")
 
         self._yubikeyVersion = self._yubikey.version()
+        self._yubikeyActive = True
 
     def _generateKey(self):
         if self._yubikey is None:
@@ -167,12 +170,7 @@ class CryptoSpoke(FirstbootSpokeMixIn, NormalSpoke):
         data = enc.encrypt(binascii.unhexlify(fixed))
         
         # Translate to scan code safe string.
-        try:
-            # Python 2
-            maketrans = string.maketrans
-        except AttributeError:
-            # Python 3
-            maketrans = bytes.maketrans
+        maketrans = string.maketrans
         t_map = maketrans("0123456789abcdef", "cbdefghijklnrtuv")
 
         outKey = binascii.hexlify(data).translate(t_map)
